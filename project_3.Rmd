@@ -1,0 +1,263 @@
+---
+title: "project_3"
+author: "Ayush Kris"
+date: "2023-04-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 1)
+
+github link:
+
+TSV file and set up
+
+    $ wget -O samples.txt 'https://www.ebi.ac.uk/ena/portal/api/filereport?accession=PRJNA665065&result=read_run&fields=run_accession,fastq_ftp,sample_title&format=tsv&download=true&limit=0'
+
+    $ while read line; do link=$(echo "$line" | cut -f 2); pre_filename=$(echo "$line" | cut -f 3); filename=$(echo "$pre_filename" | cut -d'_' -f3-); echo "$filename" "$link"; done < samples.txt
+
+    $cat samples.txt
+    LS_K5 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/018/SRR12694918/SRR12694918.fastq.gz
+    LS_K4 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/019/SRR12694919/SRR12694919.fastq.gz
+    NL_K6 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/020/SRR12694920/SRR12694920.fastq.gz
+    LS_K2 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/021/SRR12694921/SRR12694921.fastq.gz
+    Normal_N2 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/022/SRR12694922/SRR12694922.fastq.gz
+    NL_K3 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/023/SRR12694923/SRR12694923.fastq.gz
+    Normal_N20 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/024/SRR12694924/SRR12694924.fastq.gz
+    Normal_N3 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/025/SRR12694925/SRR12694925.fastq.gz
+    Normal_N19 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/026/SRR12694926/SRR12694926.fastq.gz
+    Normal_N1 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/027/SRR12694927/SRR12694927.fastq.gz
+    LS_K7 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/028/SRR12694928/SRR12694928.fastq.gz
+    NL_K1 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/029/SRR12694929/SRR12694929.fastq.gz
+    Normal_410 ftp.sra.ebi.ac.uk/vol1/fastq/SRR126/030/SRR12694930/SRR12694930.fastq.gz
+
+
+    mkdir mapped samples multi_report mapped fastqc_reports qorts_multiqc qorts counts
+
+### 2)
+
+Downloading samples and performing STAR script
+
+    #!/bin/bash -l
+
+    #SBATCH --partition=angsd_class
+    #SBATCH --nodes=1
+    #SBATCH --ntasks=1
+    #SBATCH --job-name=pipeline_1
+    #SBATCH --time=12:00:00 # HH/MM/SS
+    #SBATCH --mem=64G
+    #SBATCH --mail-user=avk4003@med.cornell.edu
+    #SBATCH --mail-type=ALL
+
+
+
+    mamba activate angsd
+
+    while read line; do link=$(echo "$line" | cut -f 2); pre_filename=$(echo "$line" | cut -f 3); filename=$(echo "$pre_filename" | cut -d'_' -f3-); wget -O samples/${filename}.fastq.gz ftp://$link; done < samples.txt
+    echo "File downloads complete" >> align_slurm_output.txt
+    for file in /athena/angsd/scratch/avk4003/samples/*fastq.gz; do
+        fastqc --extract -o /athena/angsd/scratch/avk4003/fastqc_reports "$file"
+    done
+    echo "Now beginning multiqc" >> align_slurm_output.txt
+    for file in /athena/angsd/scratch/avk4003/fastqc_reports/*_fastqc.zip; do
+        mv "$file" /athena/angsd/scratch/avk4003/multi_report
+    done
+    mamba activate multiqc
+    multiqc multi_report/
+    echo "Now beginning STAR aligning" >> align_slurm_output.txt
+    mamba activate angsd
+    for file in /athena/angsd/scratch/avk4003/samples/*.fastq.gz; do
+     out_name="${file%.fastq.gz}"
+     out_name="${out_name##*/}"
+
+
+     STAR --runMode alignReads \
+        --runThreadN 1 \
+        --genomeDir /athena/angsd/scratch/avk4003/reference_genome/GRCh38_STARindex \
+        --readFilesIn "$file" \
+        --readFilesCommand zcat \
+        --outFileNamePrefix /athena/angsd/scratch/avk4003/mapped/${out_name}. \
+        --outSAMtype BAM SortedByCoordinate ;
+    done
+    echo "Mapping completed" >> align_slurm_output.txt
+    cd /athena/angsd/scratch/avk4003/mapped
+    for file in *.bam; do
+        samtools index "$file"
+    done
+
+    echo "task executed" >> align_slurm_output.txt
+
+    Alignment QC (qorts) script
+
+    ```{}
+    #!/bin/bash -l
+    #SBATCH --partition=angsd_class
+    #SBATCH --nodes=1
+    #SBATCH --ntasks=1
+    #SBATCH --job-name=qorts_script
+    #SBATCH --time=12:00:00 # HH/MM/SS
+    #SBATCH --mem=64G
+    #SBATCH --mail-user=avk4003@med.cornell.edu
+    #SBATCH --mail-type=ALL
+
+
+    mamba activate qorts
+    for file in mapped/*.bam; do
+    java -Xmx4G -jar ~luce/angsd/gierlinski/alignment_qc/QoRTs.jar QC --singleEnded --stranded --generatePlots --maxPhredScore 45 ${file} /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf qorts/
+    done
+    mamba activate multiqc
+    mkdir qorts_multiqc
+    cd qorts_multiqc/
+    multiqc  /athena/angsd/scratch/avk4003/qorts/
+
+### 3)
+
+feature counts
+
+    #!/bin/bash -l
+    #SBATCH --partition=angsd_class
+    #SBATCH --nodes=1
+    #SBATCH --ntasks=1
+    #SBATCH --job-name=feature_counts
+    #SBATCH --time=12:00:00 # HH/MM/SS
+    #SBATCH --mem=64G
+    #SBATCH --mail-user=avk4003@med.cornell.edu
+    #SBATCH --mail-type=ALL
+
+    mamba activate angsd
+    featureCounts -s 1 -a /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf -o counts/readcounts.txt /athena/angsd/scratch/avk4003/mapped/*.bam
+    cd counts/
+    mamba activate multiqc
+    multiqc .
+
+### 4)
+
+```{r, warning=FALSE, message=FALSE}
+library(DESeq2)
+
+readcounts <- read.table("readcounts.txt", header = TRUE)
+str(readcounts)
+
+```
+
+```{r}
+# rename column names
+orig_names <- names(readcounts)
+names(readcounts)
+colnames(readcounts) <- gsub(".*mapped\\.|\\.Aligned.*", "", colnames(readcounts))
+names(readcounts)
+# rename rownames
+row.names(readcounts) <- make.names(readcounts$Geneid)
+readcounts <- readcounts[ , -c(1:6)]
+head(readcounts)
+#counts data preprocessing complete
+
+```
+
+```{r}
+#colData processing
+sample_info <- data.frame(condition = gsub("_.+", "", names(readcounts)),
+row.names = names(readcounts) )
+sample_info
+#perform check 
+all(colnames(readcounts)==rownames(sample_info))
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(magrittr)
+```
+
+```{r}
+DESeq.ds <- DESeqDataSetFromMatrix(countData = as.matrix(readcounts), colData = sample_info, design = ~ condition)
+DESeq.ds
+colSums(counts(DESeq.ds)) %>% barplot
+#remove low reads
+dim(DESeq.ds)
+keep_genes <- rowSums(counts(DESeq.ds)) > 0
+DESeq.ds <- DESeq.ds[ keep_genes, ]
+dim(DESeq.ds)
+
+```
+
+```{r}
+#set base condition to Normal
+DESeq.ds$condition
+DESeq.ds$condition %<>% relevel(ref="Normal")
+DESeq.ds$condition
+```
+
+Run DE analysis
+
+```{r}
+#Perform DESeq
+DESeq.ds %<>% DESeq()
+rowData(DESeq.ds) %>% colnames
+
+```
+
+```{r}
+#results(DESeq.ds, contrast = c("condition","LS", "normal") )
+DGE.results <- results(DESeq.ds, independentFiltering = TRUE, alpha = 0.05)
+head(DGE.results)
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(RColorBrewer)
+library(pheatmap)
+
+```
+
+```{r}
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+library(pcaExplorer)
+
+```
+
+```{r}
+DESeq.rlog <- rlog(DESeq.ds, blind = FALSE)
+#pcaExplorer(dds = DESeq.ds, dst = DESeq.rlog)
+plotPCA(DESeq.rlog, intgroup=c("condition"))
+
+
+sampleDists <- dist(t(assay(DESeq.rlog)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(DESeq.rlog$condition)
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+These plots somewhat make sense when comparing across the three condition. However, when just looking at the LS group, the results are much more coherent since we would expect to see the biggest difference with the LS group compared to the other two conditions. The LS condition is the group of samples taken from a lesion with keloid, whereas the Normal is healthy non-lesional skin, and NL is also non leasional skin but from patients with keloids on other sites. The latter two groups have the same phenotype so it is not unexpected to see that they do not differ greatly in terms of the transcriptome. When compared with the results from the paper, the Normal and NL group are very similar.
+
+```{r}
+
+assay(DESeq.ds, "log.counts") <- log2(counts(DESeq.ds, normalized = FALSE) + 1)
+## normalized read counts
+assay(DESeq.ds, "log.norm.counts") <- log2(counts(DESeq.ds, normalized=TRUE) + 1)
+par(mfrow=c(1,2))
+DESeq.ds[, c("Normal_N2","Normal_N3")] %>%
+assay(., "log.norm.counts") %>%
+plot(., cex=.1, main = "Normal_N2 vs. Normal_N3")
+DESeq.ds[, c("LS_K7","LS_K4")] %>%
+assay(., "log.norm.counts") %>%
+plot(., cex=.1, main = "LS_K7 vs LS_K4")
+
+par(mfrow=c(1,2))
+plot(assay(DESeq.ds, "log.norm.counts")[,1:2], cex=.1,
+main = "size factor and log2-transformed")
+## the rlog-transformed counts are stored in the "assay" accessor
+plot(assay(DESeq.rlog)[,1:2],
+cex=.1, main = "rlog transformed",
+xlab = colnames(assay(DESeq.rlog[,1])),
+ylab = colnames(assay(DESeq.rlog[,2])) )
+```
