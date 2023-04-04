@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### 1)
 
-github link:
+github link: <https://github.com/avk4003/angsd_project>
 
 TSV file and set up
 
