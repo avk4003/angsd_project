@@ -446,17 +446,14 @@ for file in *.bam; do
     samtools index &quot;$file&quot;
 done
 
-echo &quot;task executed&quot; &gt;&gt; align_slurm_output.txt
-
-Alignment QC (qorts) script
-
-```{}
-#!/bin/bash -l
+echo &quot;task executed&quot; &gt;&gt; align_slurm_output.txt</code></pre>
+<p>Alignment QC (QoRTs)</p>
+<pre><code>#!/bin/bash -l
 #SBATCH --partition=angsd_class
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --job-name=qorts_script
-#SBATCH --time=12:00:00 # HH/MM/SS
+#SBATCH --job-name=qorts_script_1
+#SBATCH --time=20:00:00 # HH/MM/SS
 #SBATCH --mem=64G
 #SBATCH --mail-user=avk4003@med.cornell.edu
 #SBATCH --mail-type=ALL
@@ -464,12 +461,16 @@ Alignment QC (qorts) script
 
 mamba activate qorts
 for file in mapped/*.bam; do
-java -Xmx4G -jar ~luce/angsd/gierlinski/alignment_qc/QoRTs.jar QC --singleEnded --stranded --generatePlots --maxPhredScore 45 ${file} /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf qorts/
-done
+out_name=&quot;${file%.Aligned.sortedByCoord.out.bam}&quot;
+out_name=&quot;${out_name##*/}&quot;
+java -Xmx8G -jar ~luce/angsd/gierlinski/alignment_qc/QoRTs.jar QC --singleEnded --stranded --generatePdfReport ${file} /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf qorts_1/${out_name}
+
 mamba activate multiqc
-mkdir qorts_multiqc
-cd qorts_multiqc/
-multiqc  /athena/angsd/scratch/avk4003/qorts/</code></pre>
+cd qorts_1
+multiqc
+
+
+done</code></pre>
 </div>
 <div id="section-2" class="section level3">
 <h3>3)</h3>
