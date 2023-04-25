@@ -9,7 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-### 1)
+## Shell Scripts
+
+### 1) Set up
 
 github link: <https://github.com/avk4003/angsd_project>
 
@@ -37,7 +39,7 @@ TSV file and set up
 
     mkdir mapped samples multi_report mapped fastqc_reports qorts_multiqc qorts counts
 
-### 2)
+### 2) Download and Align
 
 Downloading samples and performing STAR script
 
@@ -92,9 +94,6 @@ Downloading samples and performing STAR script
 
 Alignment QC (QoRTs)
 
-
-
-
     #!/bin/bash -l
     #SBATCH --partition=angsd_class
     #SBATCH --nodes=1
@@ -119,7 +118,7 @@ Alignment QC (QoRTs)
 
     done
 
-### 3)
+### 3) FeatureCounts
 
 feature counts
 
@@ -134,20 +133,26 @@ feature counts
     #SBATCH --mail-type=ALL
 
     mamba activate angsd
-    featureCounts -s 1 -a /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf -o counts/readcounts.txt /athena/angsd/scratch/avk4003/mapped/*.bam
+    featureCounts -s 2 -a /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf -o counts/readcounts_s2.txt /athena/angsd/scratch/avk4003/mapped/*.bam
     cd counts/
     mamba activate multiqc
     multiqc .
 
-### 4)
+## R Scripts
+
+### Read in counts matrix
+
+read in counts matrix
 
 ```{r, warning=FALSE, message=FALSE}
+library(ggplot2)
 library(DESeq2)
 
-readcounts <- read.table("readcounts.txt", header = TRUE)
-str(readcounts)
+readcounts <- read.table("readcounts_s2.txt", header = TRUE)
 
 ```
+
+clean and rename columns
 
 ```{r}
 # rename column names
@@ -163,13 +168,15 @@ head(readcounts)
 
 ```
 
+create sample_info matrix
+
 ```{r}
 #colData processing
 sample_info <- data.frame(condition = gsub("_.+", "", names(readcounts)),
 row.names = names(readcounts) )
 sample_info
 #perform check 
-all(colnames(readcounts)==rownames(sample_info))
+all(colnames(readcounts)==rownames(sample_info)) # safety check
 
 ```
 
@@ -177,15 +184,20 @@ all(colnames(readcounts)==rownames(sample_info))
 library(magrittr)
 ```
 
+### Perform DE analysis
+
+Create DESeq object
+
 ```{r}
 DESeq.ds <- DESeqDataSetFromMatrix(countData = as.matrix(readcounts), colData = sample_info, design = ~ condition)
-DESeq.ds
+head(DESeq.ds)
 colSums(counts(DESeq.ds)) %>% barplot
 #remove low reads
 dim(DESeq.ds)
-keep_genes <- rowSums(counts(DESeq.ds)) > 0
+keep_genes <- rowSums(counts(DESeq.ds)) > 10 #filter 
 DESeq.ds <- DESeq.ds[ keep_genes, ]
 dim(DESeq.ds)
+colSums(counts(DESeq.ds)) %>% barplot
 
 ```
 
@@ -193,6 +205,7 @@ dim(DESeq.ds)
 #set base condition to Normal
 DESeq.ds$condition
 DESeq.ds$condition %<>% relevel(ref="Normal")
+# DESeq.ds$condition <- relevel(DESeq.ds$condition, ref="Normal")
 DESeq.ds$condition
 ```
 
@@ -205,45 +218,68 @@ rowData(DESeq.ds) %>% colnames
 
 ```
 
-```{r}
-#results(DESeq.ds, contrast = c("condition","LS", "normal") )
-DGE.results <- results(DESeq.ds, independentFiltering = TRUE, alpha = 0.05)
-head(DGE.results)
-```
-
 ```{r, warning=FALSE, message=FALSE}
 library(RColorBrewer)
 library(pheatmap)
-
+library(org.Hs.eg.db)
 ```
+
+### Quality Control
 
 ```{r}
+boxplot(log2(counts(DESeq.ds) +1), notch=TRUE,
+main = "Non-normalized read counts",
+ylab ="log2(read counts)", cex = .6)
 
+## bp of size-factor normalized values
+boxplot(log2(counts(DESeq.ds, normalized=TRUE) +1), notch=TRUE,
+main = "Size-factor-normalized read counts",
+ylab ="log2(read counts)", cex = .6)
+
+
+png('Plots/dispPlot.png', res=200, width = 1900, height = 1100)
+print(plotDispEsts(DESeq.ds))
+dev.off()
+plotDispEsts(DESeq.ds)
 ```
+
+There are not significant global differences between samples, nonetheless, the normalization helped adjust slight global differences between the samples
+
+Dispersion plot shows that fitted line trends below 1
 
 ```{r, warning=FALSE, message=FALSE}
 library(pcaExplorer)
 
 ```
 
+[Analyzing RNA-seq data with DESeq2 (bioconductor.org)](https://www.bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#data-quality-assessment-by-sample-clustering-and-visualization)
+
+PCA
+
 ```{r}
 DESeq.rlog <- rlog(DESeq.ds, blind = FALSE)
 #pcaExplorer(dds = DESeq.ds, dst = DESeq.rlog)
 plotPCA(DESeq.rlog, intgroup=c("condition"))
 
+png('Plots/PCA.png', res=250, width = 1900, height = 1100)
+print(plotPCA(DESeq.rlog, intgroup=c("condition")))
+dev.off()
 
 sampleDists <- dist(t(assay(DESeq.rlog)))
 sampleDistMatrix <- as.matrix(sampleDists)
 rownames(sampleDistMatrix) <- paste(DESeq.rlog$condition)
 colnames(sampleDistMatrix) <- NULL
 colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-pheatmap(sampleDistMatrix,
+sampleDistHeat<-pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists,
          col=colors)
+png('Plots/sampleDistHeat.png', res=250, width = 1900, height = 1100)
+print(sampleDistHeat)
+dev.off()
 ```
 
-These plots somewhat make sense when comparing across the three condition. However, when just looking at the LS group, the results are much more coherent since we would expect to see the biggest difference with the LS group compared to the other two conditions. The LS condition is the group of samples taken from a lesion with keloid, whereas the Normal is healthy non-lesional skin, and NL is also non leasional skin but from patients with keloids on other sites. The latter two groups have the same phenotype so it is not unexpected to see that they do not differ greatly in terms of the transcriptome. When compared with the results from the paper, the Normal and NL group are very similar.
+These plots somewhat make sense when comparing across the three condition. However, when just looking at the LS group, the results are much more coherent since we would expect to see the biggest difference with the LS group compared to the other two conditions. The LS condition is the group of samples taken from a lesion with keloid, whereas the Normal is healthy non-lesional skin, and NL is also non leasional skin but from patients with keloids on other sites. The latter two groups have the same phenotype so it is not unexpected to see that they do not differ greatly in terms of the transcriptome. When compared with the results from the paper, the Normal and NL group are very similar. The PCA indicates that one of the samples in the control is an outlier (Normal_N20).
 
 ```{r}
 
@@ -266,4 +302,241 @@ plot(assay(DESeq.rlog)[,1:2],
 cex=.1, main = "rlog transformed",
 xlab = colnames(assay(DESeq.rlog[,1])),
 ylab = colnames(assay(DESeq.rlog[,2])) )
+```
+
+Variance is tightened when using rlog
+
+### Finding DE genes
+
+Performing DE for each of the three comparisions: Lesional vs healthy control, Non-lesional vs healthy control, Lesional vs Non lesional. Alpha set to 0.05
+
+MA plot
+
+```{r}
+DGE_results_LSvNormal <- results(DESeq.ds, independentFiltering = TRUE, alpha = 0.05, contrast = c("condition","LS", "Normal"))
+DGE_results_NLvNormal <- results(DESeq.ds, independentFiltering = TRUE, alpha = 0.05, contrast = c("condition","NL", "Normal"))
+DGE_results_LSvNL <- results(DESeq.ds, independentFiltering = TRUE, alpha = 0.05, contrast = c("condition","LS", "NL"))
+
+LSvNormal_MAplot<-plotMA(DGE_results_LSvNormal, alpha=0.05,
+main="LS vs Normal Test: p.adj.value < 0.05", ylim = c(-5,5))
+png('Plots/LSvNormal_MAplot.png', res=250, width = 1900, height = 1100)
+print(plotMA(DGE_results_LSvNormal, alpha=0.05,
+main="LS vs Normal Test: p.adj.value < 0.05", ylim = c(-5,5)))
+dev.off()
+
+NLvNormal_MAplot<-plotMA(DGE_results_NLvNormal, alpha=0.05,
+main="NL vs Normal Test: p.adj.value < 0.05", ylim = c(-5,5))
+png('Plots/NLvNormal_MAplot.png', res=250, width = 1900, height = 1100)
+print(plotMA(DGE_results_NLvNormal, alpha=0.05,
+main="NL vs Normal Test: p.adj.value < 0.05", ylim = c(-5,5)))
+dev.off()
+
+
+LSvNL_MAplot<-plotMA(DGE_results_LSvNL, alpha=0.05,
+main="LS vs NL Test: p.adj.value < 0.05", ylim = c(-5,5))
+png('Plots/LSvNL_MAplot.png', res=250, width = 1900, height = 1100)
+print(plotMA(DGE_results_LSvNL, alpha=0.05,
+main="LS vs NL Test: p.adj.value < 0.05", ylim = c(-5,5)))
+dev.off()
+
+LSvNormal_MAplot
+NLvNormal_MAplot
+LSvNL_MAplot
+```
+
+Much more DE genes in LS vs Normal and LS vs NL. NL vs Normal has very few DE genes in comparison, and is in agreement with the results of PCA.
+
+Removing NA values
+
+```{r}
+dim(DGE_results_NLvNormal)
+DGE_results_NLvNormal<-na.omit(DGE_results_NLvNormal)
+dim(DGE_results_NLvNormal)
+
+dim(DGE_results_LSvNormal)
+DGE_results_LSvNormal<-na.omit(DGE_results_LSvNormal)
+dim(DGE_results_LSvNormal)
+
+dim(DGE_results_LSvNL)
+DGE_results_LSvNL<-na.omit(DGE_results_LSvNL)
+dim(DGE_results_LSvNL)
+
+DGE_results_NLvNormal_sorted <- DGE_results_NLvNormal %>% `[`(order(.$padj),)
+DGE_results_LSvNormal_sorted <- DGE_results_LSvNormal %>% `[`(order(.$padj),)
+DGE_results_LSvNL_sorted <- DGE_results_LSvNL %>% `[`(order(.$padj),)
+
+```
+
+extract significant gene names (ENSEMBL IDs) by filtering for padj values less than 0.05, and a log2FoldChange greater than 1 or less than -1
+
+```{r}
+
+NLvNormal_DGEgenes <- rownames(subset(DGE_results_NLvNormal_sorted, padj < 0.05 & abs(log2FoldChange) > 1))
+LSvNormal_DGEgenes <- rownames(subset(DGE_results_LSvNormal_sorted, padj < 0.05 & abs(log2FoldChange) > 1))
+LSvNL_DGEgenes <- rownames(subset(DGE_results_LSvNL_sorted, padj < 0.05 & abs(log2FoldChange) > 1))
+```
+
+### Heatmap of DE genes
+
+Three heatmaps for the three comparisons, displaying the DE genes for each sample.
+
+```{r}
+all_DGEgenes<-unique(c(NLvNormal_DGEgenes, LSvNormal_DGEgenes, LSvNL_DGEgenes))
+
+
+heatmap_rlog_df<-assay(DESeq.rlog[LSvNormal_DGEgenes,])
+ensembl_ids <- rownames(heatmap_rlog_df)
+gene_names <- mapIds(org.Hs.eg.db, keys = ensembl_ids, column = "SYMBOL", keytype = "ENSEMBL", multiVals = "first")
+rownames(heatmap_rlog_df) <- gene_names
+gene_names_LSvNormal <- rownames(heatmap_rlog_df[1:100, ])
+
+LSvNormal_heat<-pheatmap(heatmap_rlog_df[1:50, ], scale="row",show_rownames=TRUE, main="LS vs Normal DGE (row-based z-score)")
+
+png('Plots/LSvNormal_heat.png', res=250, width = 1500, height = 2100)
+print(LSvNormal_heat)
+dev.off()
+LSvNormal_heat
+
+heatmap_rlog_df<-assay(DESeq.rlog[LSvNL_DGEgenes,])
+ensembl_ids <- rownames(heatmap_rlog_df)
+gene_names <- mapIds(org.Hs.eg.db, keys = ensembl_ids, column = "SYMBOL", keytype = "ENSEMBL", multiVals = "first")
+rownames(heatmap_rlog_df) <- gene_names
+gene_names_LSvNL <- rownames(heatmap_rlog_df[1:100, ])
+
+LSvNL_heat<-pheatmap(heatmap_rlog_df[1:50, ], scale="row",show_rownames=TRUE, main="LS vs NL DGE (row-based z-score)")
+png('Plots/LSvNL_heat.png', res=250, width = 1500, height = 2100)
+print(LSvNL_heat)
+dev.off()
+LSvNL_heat
+
+heatmap_rlog_df<-assay(DESeq.rlog[NLvNormal_DGEgenes,])
+#library(org.Hs.eg.db)
+ensembl_ids <- rownames(heatmap_rlog_df)
+gene_names <- mapIds(org.Hs.eg.db, keys = ensembl_ids, column = "SYMBOL", keytype = "ENSEMBL", multiVals = "first")
+rownames(heatmap_rlog_df) <- gene_names
+gene_names_NLvNormal <- rownames(heatmap_rlog_df[1:50, ])
+
+NLvNormal_heat<-pheatmap(heatmap_rlog_df[1:50, ], scale="row",show_rownames=TRUE, main="NL vs Normal DGE (row-based z-score)")
+png('Plots/NLvNormal_heat.png', res=250, width = 1500, height = 2100)
+print(NLvNormal_heat)
+dev.off()
+NLvNormal_heat
+
+
+```
+
+The LS vs Normal and LS vs NL heatmaps show a clear difference in gene expression with the LS samples clustering separately. The LS vs NL heatmaps shows the three conditions separating into three clusters well. In the LS vs Normal heatmap, we can see that the NL and Normal conditions do not separate well. As expected, the NL vs Normal heatmap does not indicate strong expression patterns but surprisingly clustered the samples in three conditions well.
+
+### Volcano Plots
+
+```{r, message=FALSE, warning=FALSE}
+# add column with Gene symbols
+DGE_results_NLvNormal_sorted_symbol<-DGE_results_NLvNormal_sorted
+DGE_results_LSvNormal_sorted_symbol<-DGE_results_LSvNormal_sorted
+DGE_results_LSvNL_sorted_symbol<-DGE_results_LSvNL_sorted
+
+DGE_results_NLvNormal_sorted_symbol$symbol<-mapIds(org.Hs.eg.db, keys = rownames(DGE_results_NLvNormal_sorted_symbol), keytype = "ENSEMBL", column = "SYMBOL")
+DGE_results_LSvNormal_sorted_symbol$symbol<-mapIds(org.Hs.eg.db, keys = rownames(DGE_results_LSvNormal_sorted_symbol), keytype = "ENSEMBL", column = "SYMBOL")
+DGE_results_LSvNL_sorted_symbol$symbol<-mapIds(org.Hs.eg.db, keys = rownames(DGE_results_LSvNL_sorted_symbol), keytype = "ENSEMBL", column = "SYMBOL")
+
+# plot volcano plots
+library(EnhancedVolcano)
+
+NLvNormal_Plot<-EnhancedVolcano(DGE_results_NLvNormal_sorted_symbol,
+lab=DGE_results_NLvNormal_sorted_symbol$symbol,
+x='log2FoldChange', y='padj', selectLab = gene_names_NLvNormal,
+pCutoff=0.05,
+title="NL / Normal")
+png('Plots/NLvNormal_Plot.png', res=100, width = 1900, height = 1100)
+print(NLvNormal_Plot)
+dev.off()
+NLvNormal_Plot
+
+LSvNormal_Plot<-EnhancedVolcano(DGE_results_LSvNormal_sorted_symbol,
+lab=DGE_results_LSvNormal_sorted_symbol$symbol,
+x='log2FoldChange', y='padj', selectLab = gene_names_LSvNormal ,
+pCutoff=0.05,
+title="LS / Normal")
+png('Plots/LSvNormal_Plot.png', res=100, width = 1900, height = 1100)
+print(LSvNormal_Plot)
+dev.off()
+LSvNormal_Plot
+
+LSvNL_Plot<-EnhancedVolcano(DGE_results_LSvNL_sorted_symbol,
+lab=DGE_results_LSvNL_sorted_symbol$symbol,
+x='log2FoldChange', y='padj', selectLab = gene_names_LSvNL ,
+pCutoff=0.05,
+title="LS / NL")
+
+png('Plots/LSvNL_Plot.png', res=100, width = 1900, height = 1100)
+print(LSvNL_Plot)
+dev.off()
+LSvNL_Plot
+```
+
+As hypothesized, there is a significant difference in the transcriptomic profile in keloids vs normal skin with many genes being responsible for cell proliferation, inflammation, and bone cartilage.
+
+### Normalized gene expression plots for few genes of interest
+
+```{r}
+df<-plotCounts(DESeq.ds, gene="ENSG00000115414", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p1<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "FN1")
+
+df<-plotCounts(DESeq.ds, gene="ENSG00000105664", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p2<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "COMP")
+
+df<-plotCounts(DESeq.ds, gene="ENSG00000134013", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p3<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "LOXL2")
+
+df<-plotCounts(DESeq.ds, gene="ENSG00000157766", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p4<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "ACAN")
+
+
+df<-plotCounts(DESeq.ds, gene="ENSG00000119699", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p6<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "TGFB3")
+
+df<-plotCounts(DESeq.ds, gene="ENSG00000149257", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p7<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "SERPINH1")
+
+
+
+library(cowplot)
+
+pg<-plot_grid(p1, p2, p3, p4,p6,p7, ncol = 3)
+
+
+png('Plots/PlotGrid.png', res=250, width = 1900, height = 1100)
+print(pg)
+dev.off()
+pg
+```
+
+## Datasets
+
+```{r}
+
+rlog_data<-assay(DESeq.rlog)
+write.csv(readcounts, "data/counts.csv")
+write.csv(rlog_data, "data/rlog_data.csv")
+write.csv(DGE_results_NLvNormal_sorted, "data/NLvNormal.csv")
+write.csv(DGE_results_LSvNL_sorted, "data/LSvNL.csv")
+write.csv(DGE_results_LSvNormal_sorted, "data/LSvNormal.csv")
+
+```
+
+| Data                         | Link |
+|------------------------------|------|
+| Counts data                  |      |
+| rlog data                    |      |
+| DGE_results_NLvNormal_sorted |      |
+| DGE_results_LSvNL_sorted     |      |
+| DGE_results_LSvNormal_sorted |      |
+
+```{r}
+
+```
+
+```{r}
+
+
 ```
