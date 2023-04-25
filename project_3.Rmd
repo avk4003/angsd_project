@@ -565,27 +565,27 @@ DownNLvNormal<-plot(barplot(GO_results_NLvNormal_DGEgenesDOWN, showCategory = 20
 DownLSvNormal<-plot(barplot(GO_results_LSvNormal_DGEgenesDOWN, showCategory = 20, title = "LSvNormal_DGEgenesDOWN"))
 DownLSvNL<-plot(barplot(GO_results_LSvNL_DGEgenesDOWN, showCategory = 20, title = "LSvNL_DGEgenesDOWN"),)
 
-png('Plots/UpLSvNL.png', res=250, width = 1900, height = 1100)
+png('Plots/UpLSvNL.png', res=110, width = 1900, height = 1100)
 print(UpLSvNL)
 dev.off()
 
 
-png('Plots/UpLSvNormal.png', res=250, width = 1900, height = 1100)
+png('Plots/UpLSvNormal.png', res=110, width = 1900, height = 1100)
 print(UpLSvNormal)
 dev.off()
 
 
-png('Plots/DownNLvNormal.png', res=250, width = 1900, height = 1100)
+png('Plots/DownNLvNormal.png', res=110, width = 1900, height = 1100)
 print(DownNLvNormal)
 dev.off()
 
 
-png('Plots/DownLSvNormal.png', res=250, width = 1900, height = 1100)
+png('Plots/DownLSvNormal.png', res=110, width = 1900, height = 1100)
 print(DownLSvNormal)
 dev.off()
 
 
-png('Plots/DownLSvNL', res=250, width = 1900, height = 1100)
+png('Plots/DownLSvNL.png', res=110, width = 1900, height = 1100)
 print(DownLSvNL)
 dev.off()
 
