@@ -525,18 +525,72 @@ write.csv(DGE_results_LSvNormal_sorted, "data/LSvNormal.csv")
 ```
 
 | Data                         | Link                                                                                                                                              |
-|------------------------------------|------------------------------------|
+|----------------|--------------------------------------------------------|
 | Counts data                  | [angsd_project/counts.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/counts.csv)       |
 | rlog data                    | [angsd_project/rlog_data.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/rlog_data.csv) |
 | DGE_results_NLvNormal_sorted | [angsd_project/NLvNormal.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/NLvNormal.csv) |
 | DGE_results_LSvNL_sorted     | [angsd_project/LSvNL.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/LSvNL.csv)         |
 | DGE_results_LSvNormal_sorted | [angsd_project/LSvNormal.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/LSvNormal.csv) |
 
+```{r, message=FALSE, warning=FALSE}
+library(clusterProfiler)
+library(AnnotationDbi)
+NLvNormal_DGEgenesUP <- rownames(subset(DGE_results_NLvNormal_sorted, padj < 0.05 & log2FoldChange > 1))
+LSvNormal_DGEgenesUP <- rownames(subset(DGE_results_LSvNormal_sorted, padj < 0.05 & log2FoldChange > 1))
+LSvNL_DGEgenesUP <- rownames(subset(DGE_results_LSvNL_sorted, padj < 0.05 & log2FoldChange > 1))
+
+
+NLvNormal_DGEgenesDOWN <- rownames(subset(DGE_results_NLvNormal_sorted, padj < 0.05 & log2FoldChange < -1))
+LSvNormal_DGEgenesDOWN <- rownames(subset(DGE_results_LSvNormal_sorted, padj < 0.05 & log2FoldChange < -1))
+LSvNL_DGEgenesDOWN <- rownames(subset(DGE_results_LSvNL_sorted, padj < 0.05 & log2FoldChange < -1))
+```
+
 ```{r}
+GO_results_NLvNormal_DGEgenesUP<-enrichGO(gene = NLvNormal_DGEgenesUP, OrgDb = "org.Hs.eg.db", keyType = "ENSEMBL", ont = "BP")
+GO_results_LSvNormal_DGEgenesUP<-enrichGO(gene = LSvNormal_DGEgenesUP, OrgDb = "org.Hs.eg.db", keyType = "ENSEMBL", ont = "BP")
+GO_results_LSvNL_DGEgenesUP<-enrichGO(gene = LSvNL_DGEgenesUP, OrgDb = "org.Hs.eg.db", keyType = "ENSEMBL", ont = "BP")
+
+GO_results_NLvNormal_DGEgenesDOWN<-enrichGO(gene = NLvNormal_DGEgenesDOWN, OrgDb = "org.Hs.eg.db", keyType = "ENSEMBL", ont = "BP")
+GO_results_LSvNormal_DGEgenesDOWN<-enrichGO(gene = LSvNormal_DGEgenesDOWN, OrgDb = "org.Hs.eg.db", keyType = "ENSEMBL", ont = "BP")
+GO_results_LSvNL_DGEgenesDOWN<-enrichGO(gene = LSvNL_DGEgenesDOWN, OrgDb = "org.Hs.eg.db", keyType = "ENSEMBL", ont = "BP")
 
 ```
 
 ```{r}
+#plot(barplot(GO_results_NLvNormal_DGEgenesUP, showCategory = 20))
+UpLSvNormal<-plot(barplot(GO_results_LSvNormal_DGEgenesUP, showCategory = 20, title = "LSvNormal_DGEgenesUP"))
+UpLSvNL<-plot(barplot(GO_results_LSvNL_DGEgenesUP, showCategory = 20, title = "LSvNL_DGEgenesUP"))
+
+DownNLvNormal<-plot(barplot(GO_results_NLvNormal_DGEgenesDOWN, showCategory = 20, title = "NLvNormal_DGEgenesDOWN"))
+DownLSvNormal<-plot(barplot(GO_results_LSvNormal_DGEgenesDOWN, showCategory = 20, title = "LSvNormal_DGEgenesDOWN"))
+DownLSvNL<-plot(barplot(GO_results_LSvNL_DGEgenesDOWN, showCategory = 20, title = "LSvNL_DGEgenesDOWN"),)
+
+png('Plots/UpLSvNL.png', res=250, width = 1900, height = 1100)
+print(UpLSvNL)
+dev.off()
+
+
+png('Plots/UpLSvNormal.png', res=250, width = 1900, height = 1100)
+print(UpLSvNormal)
+dev.off()
+
+
+png('Plots/DownNLvNormal.png', res=250, width = 1900, height = 1100)
+print(DownNLvNormal)
+dev.off()
+
+
+png('Plots/DownLSvNormal.png', res=250, width = 1900, height = 1100)
+print(DownLSvNormal)
+dev.off()
+
+
+png('Plots/DownLSvNL', res=250, width = 1900, height = 1100)
+print(DownLSvNL)
+dev.off()
+
 
 
 ```
+
+GO of NL versus Normal upregulated genes revealed 0 pathways. NL versus Normal down-regulated genes do not offer insight into pathways, and the gene counts for the pathways presented are very low. GO of the remaining comparision yield useful insight. GO shows upregulation of immune system, collagen fibril organisation, ossification, extracelular matrix organisation, and down regulation of epidermis and skin development, and epidermal differentiation in the keloid condition.
