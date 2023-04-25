@@ -524,13 +524,13 @@ write.csv(DGE_results_LSvNormal_sorted, "data/LSvNormal.csv")
 
 ```
 
-| Data                         | Link |
-|------------------------------|------|
-| Counts data                  |      |
-| rlog data                    |      |
-| DGE_results_NLvNormal_sorted |      |
-| DGE_results_LSvNL_sorted     |      |
-| DGE_results_LSvNormal_sorted |      |
+| Data                         | Link                                                                                                                                              |
+|------------------------------------|------------------------------------|
+| Counts data                  | [angsd_project/counts.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/counts.csv)       |
+| rlog data                    | [angsd_project/rlog_data.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/rlog_data.csv) |
+| DGE_results_NLvNormal_sorted | [angsd_project/NLvNormal.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/NLvNormal.csv) |
+| DGE_results_LSvNL_sorted     | [angsd_project/LSvNL.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/LSvNL.csv)         |
+| DGE_results_LSvNormal_sorted | [angsd_project/LSvNormal.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/LSvNormal.csv) |
 
 ```{r}
 
