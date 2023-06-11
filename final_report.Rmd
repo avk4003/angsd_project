@@ -109,20 +109,18 @@ STAR alignment was used since it has a higher tolerance for more soft-clipped an
 
 For Alignment QC, QORTs followed by multiqc was used. --singleEnded and --stranded parameters were added as the data is single end reads and reverse stranded.
 
-```{}
-mamba activate qorts
-for file in mapped/*.bam; do
-out_name="${file%.Aligned.sortedByCoord.out.bam}"
-out_name="${out_name##*/}"
-java -Xmx8G -jar ~luce/angsd/gierlinski/alignment_qc/QoRTs.jar QC --singleEnded --stranded --generatePdfReport ${file} /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf qorts_1/${out_name}
+    mamba activate qorts
+    for file in mapped/*.bam; do
+    out_name="${file%.Aligned.sortedByCoord.out.bam}"
+    out_name="${out_name##*/}"
+    java -Xmx8G -jar ~luce/angsd/gierlinski/alignment_qc/QoRTs.jar QC --singleEnded --stranded --generatePdfReport ${file} /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf qorts_1/${out_name}
 
-mamba activate multiqc
-cd qorts_1
-multiqc
+    mamba activate multiqc
+    cd qorts_1
+    multiqc
 
 
-done
-```
+    done
 
 Majority of genes mapped to Unique Gene as shown in multiqc_alignment_report.html. Qorts file also does not show signficant 3' or 5' degradation. Alignment QC looks good since primary alignments is greater than 90% and genome is sufficiently covered.
 
@@ -130,13 +128,11 @@ Majority of genes mapped to Unique Gene as shown in multiqc_alignment_report.htm
 
 Using feature counts, the count table was generated. Feature counts was first run with -s1 flag. Looking at the multiQC to see single digit percentages of successful mappings, the flag was changed to -s2 which rectified the issue. Multiqc was then performed again.
 
-```{}
-mamba activate angsd
-featureCounts -s 2 -a /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf -o counts/readcounts_s2.txt /athena/angsd/scratch/avk4003/mapped/*.bam
-cd counts/
-mamba activate multiqc
-multiqc .
-```
+    mamba activate angsd
+    featureCounts -s 2 -a /athena/angsd/scratch/avk4003/reference_genome/Homo_sapiens.GRCh38.109.gtf -o counts/readcounts_s2.txt /athena/angsd/scratch/avk4003/mapped/*.bam
+    cd counts/
+    mamba activate multiqc
+    multiqc .
 
 #### DE analysis in R
 
@@ -527,7 +523,7 @@ dev.off()
 
 ```
 
-Gene Ontology (GO) of NL versus Normal upregulated genes revealed zero pathways and caused an error during plotting which is why the plot for NL vs Normal is commented out since there was nothing to plot. \
+Gene Ontology (GO) of NL versus Normal upregulated genes revealed zero pathways and caused an error during plotting which is why the plot for NL vs Normal is commented out since there was nothing to plot.\
 GO shows upregulation of immune system, collagen fibril organisation, ossification, extracelular matrix organisation, and down regulation of epidermis and skin development, and epidermal differentiation in the keloid condition.
 
 [Saving Datasets]{.underline}
@@ -544,13 +540,13 @@ write.csv(DGE_results_LSvNormal_sorted, "data/LSvNormal.csv")
 #### Discussion
 
 The first issue was creating a bash script. Since a windows device was used, when the script was transferred to the linux server, the script would run into an error. The fix to this was writing the script in the linux server itself instead of transferring from windows since windows adds invisible nextline characters which will cause an error in linux.\
-The second issue was very low mapped unique reads (\<10% for each sample) when looking at the multiqc report for featureCounts. The issue was resolved when the stranded parameter in featureCounts was changed from s1 to s2 to indicate reverse strandedness. \
+The second issue was very low mapped unique reads (\<10% for each sample) when looking at the multiqc report for featureCounts. The issue was resolved when the stranded parameter in featureCounts was changed from s1 to s2 to indicate reverse strandedness.\
 Another small problem was the error produced by plotting GO results of upregulated NLvsNormal genes. Unsurprisingly, there were no results produced from the enrichGO() function since there are not many differences between NL and the Control group. The plot for that was commented out, leaving 5 out of 6 plots.
 
 **Dataset Table**
 
 | Data                         | Link                                                                                                                                              |
-|-----------------|-------------------------------------------------------|
+|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | Counts data                  | [angsd_project/counts.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/counts.csv)       |
 | rlog data                    | [angsd_project/rlog_data.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/rlog_data.csv) |
 | DGE_results_NLvNormal_sorted | [angsd_project/NLvNormal.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/NLvNormal.csv) |

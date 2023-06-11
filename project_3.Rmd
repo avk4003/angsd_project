@@ -498,14 +498,23 @@ p6<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+
 df<-plotCounts(DESeq.ds, gene="ENSG00000149257", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
 p7<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "SERPINH1")
 
+df<-plotCounts(DESeq.ds, gene="ENSG00000104415", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p8<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "CCN4")
+
+df<-plotCounts(DESeq.ds, gene="ENSG00000168487", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p9<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "BMP1")
+
+df<-plotCounts(DESeq.ds, gene="ENSG00000064205", normalized = TRUE, transform = TRUE, xlab="Condition", returnData = TRUE)
+p10<-ggplot(df, aes(x = condition, y = count, fill = condition)) +geom_boxplot()+theme_bw()+labs(x = "Condition", y = "Log2 Normalized Counts", title = "CCN5")
+
 
 
 library(cowplot)
 
-pg<-plot_grid(p1, p2, p3, p4,p6,p7, ncol = 3)
+pg<-plot_grid(p8,p10,p3,p7, p1,p9,p4,p2,p6, ncol = 3)
 
 
-png('Plots/PlotGrid.png', res=250, width = 1900, height = 1100)
+png('Plots/PlotGrid.png', res=300, width=3840, height=2160)
 print(pg)
 dev.off()
 pg
@@ -525,7 +534,7 @@ write.csv(DGE_results_LSvNormal_sorted, "data/LSvNormal.csv")
 ```
 
 | Data                         | Link                                                                                                                                              |
-|----------------|--------------------------------------------------------|
+|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | Counts data                  | [angsd_project/counts.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/counts.csv)       |
 | rlog data                    | [angsd_project/rlog_data.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/rlog_data.csv) |
 | DGE_results_NLvNormal_sorted | [angsd_project/NLvNormal.csv at main · avk4003/angsd_project (github.com)](https://github.com/avk4003/angsd_project/blob/main/data/NLvNormal.csv) |
@@ -565,27 +574,27 @@ DownNLvNormal<-plot(barplot(GO_results_NLvNormal_DGEgenesDOWN, showCategory = 20
 DownLSvNormal<-plot(barplot(GO_results_LSvNormal_DGEgenesDOWN, showCategory = 20, title = "LSvNormal_DGEgenesDOWN"))
 DownLSvNL<-plot(barplot(GO_results_LSvNL_DGEgenesDOWN, showCategory = 20, title = "LSvNL_DGEgenesDOWN"),)
 
-png('Plots/UpLSvNL.png', res=110, width = 1900, height = 1100)
+png('Plots/UpLSvNL.png', res=290, width=3840, height=2160)
 print(UpLSvNL)
 dev.off()
 
 
-png('Plots/UpLSvNormal.png', res=110, width = 1900, height = 1100)
+png('Plots/UpLSvNormal.png', res=260, width=3840, height=2160)
 print(UpLSvNormal)
 dev.off()
 
 
-png('Plots/DownNLvNormal.png', res=110, width = 1900, height = 1100)
+png('Plots/DownNLvNormal.png', res=290, width=3840, height=2160)
 print(DownNLvNormal)
 dev.off()
 
 
-png('Plots/DownLSvNormal.png', res=110, width = 1900, height = 1100)
+png('Plots/DownLSvNormal.png', res=290, width=3840, height=2160)
 print(DownLSvNormal)
 dev.off()
 
 
-png('Plots/DownLSvNL.png', res=110, width = 1900, height = 1100)
+png('Plots/DownLSvNL.png', res=290, width=3840, height=2160)
 print(DownLSvNL)
 dev.off()
 
